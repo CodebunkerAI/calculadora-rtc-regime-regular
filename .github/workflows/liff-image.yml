@@ -1,0 +1,41 @@
+# LIFF: constrói a imagem da Calculadora (perfil offline) e publica no GHCR.
+# Tag = SHA do commit; `latest` só na main. Upstream (ReceitaFederal) não usa este arquivo.
+name: liff-image
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ghcr.io/codebunkerai/calculadora-rtc:${{ github.sha }}
+            ${{ github.ref == 'refs/heads/main' && 'ghcr.io/codebunkerai/calculadora-rtc:latest' || '' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test (cálculo 2027)
+        if: github.event_name == 'pull_request'
+        run: |
+          docker build -t calc:pr .
+          docker run -d --name calc-smoke -p 8080:8080 calc:pr
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:8080/api/calculadora/dados-abertos/versao && break; sleep 2; done
+          curl -sf -X POST http://localhost:8080/api/calculadora/regime-geral -H 'content-type: application/json' \
+            -d '{"id":"t","versao":"1.00","dhFatoGerador":"2027-03-15T12:00:00-03:00","municipio":3550308,"uf":"SP","itens":[{"numero":1,"ncm":"72091600","cst":"000","cClassTrib":"000001","baseCalculo":10000,"quantidade":1,"unidade":"UN","aliquotasNominais":{"cbs":8.9,"ibsEstadual":0.05,"ibsMunicipal":0.05}}]}' \
+            | tee r.json | jq -e '.objetos[0].tribCalc.IBSCBS.gIBSCBS.gCBS.vCBS == "890.00"'
