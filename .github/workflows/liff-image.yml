@@ -34,7 +34,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           docker build -t calc:pr .
-          docker run -d --name c -p 8080:8080 calc:pr
+          docker run -d --name calc-smoke -p 8080:8080 calc:pr
           for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:8080/api/calculadora/dados-abertos/versao && break; sleep 2; done
           curl -sf -X POST http://localhost:8080/api/calculadora/regime-geral -H 'content-type: application/json' \
             -d '{"id":"t","versao":"1.00","dhFatoGerador":"2027-03-15T12:00:00-03:00","municipio":3550308,"uf":"SP","itens":[{"numero":1,"ncm":"72091600","cst":"000","cClassTrib":"000001","baseCalculo":10000,"quantidade":1,"unidade":"UN","aliquotasNominais":{"cbs":8.9,"ibsEstadual":0.05,"ibsMunicipal":0.05}}]}' \
